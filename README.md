@@ -50,29 +50,6 @@ meteor add cordova:cordova-plugin-camera-preview@X.X.X
 <gap:plugin name="cordova-plugin-camera-preview" />
 ```
 
-#### iOS Quirks
-If you are developing for iOS 10+ you must also add the following to your config.xml
-
-```xml
-<config-file platform="ios" target="*-Info.plist" parent="NSCameraUsageDescription" overwrite="true">
-  <string>Allow the app to use your camera</string>
-</config-file>
-
-<!-- or for Phonegap -->
-
-<gap:config-file platform="ios" target="*-Info.plist" parent="NSCameraUsageDescription" overwrite="true">
-  <string>Allow the app to use your camera</string>
-</gap:config-file>
-```
-
-### Android Quirks (older devices)
-When using the plugin for older devices, the camera preview will take the focus inside the app once initialized.
-In order to prevent the app from closing when a user presses the back button, the event for the camera view is disabled.
-If you still want the user to navigate, you can add a listener for the back event for the preview 
-(see <code>[onBackButton](#onBackButton)</code>) 
-
-
-
 # Methods
 
 ### startCamera(options, [successCallback, errorCallback])
@@ -90,7 +67,6 @@ All options stated are optional and will default to values here
 * `camera` - See <code>[CAMERA_DIRECTION](#camera_Settings.CameraDirection)</code> - Defaults to front camera/code>
 * `toBack` - Defaults to false - Set to true if you want your html in front of your preview
 * `tapPhoto` - Defaults to true - Does not work if toBack is set to false in which case you use the takePicture method
-* `tapFocus` - Defaults to false - Allows the user to tap to focus, when the view is in the foreground
 * `previewDrag` - Defaults to false - Does not work if toBack is set to false
 
 ```javascript
@@ -102,7 +78,6 @@ let options = {
   camera: CameraPreview.CAMERA_DIRECTION.BACK,
   toBack: false,
   tapPhoto: true,
-  tapFocus: false,
   previewDrag: false
 };
 
@@ -116,8 +91,6 @@ html, body, .ion-app, .ion-content {
   background-color: transparent;
 }
 ```
-
-When both tapFocus and tapPhoto are true, the camera will focus, and take a picture as soon as the camera is done focusing.
 
 ### stopCamera([successCallback, errorCallback])
 
@@ -377,16 +350,6 @@ CameraPreview.getSupportedPictureSizes(function(dimensions){
 let xPoint = event.x;
 let yPoint = event.y
 CameraPreview.tapToFocus(xPoint, yPoint);
-```
-
-### onBackButton(successCallback, [errorCallback])
-
-<info>Callback event for the back button tap</info><br/>
-
-```javascript
-CameraPreview.onBackButton(function() {
-  console.log('Back button pushed');
-});
 ```
 
 # Settings

@@ -33,11 +33,9 @@ import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
-import android.support.media.ExifInterface;
 
 import org.apache.cordova.LOG;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.Exception;
@@ -54,7 +52,6 @@ public class CameraActivity extends Fragment {
     void onPictureTakenError(String message);
     void onFocusSet(int pointX, int pointY);
     void onFocusSetError(String message);
-    void onBackButton();
     void onCameraStarted();
   }
 
@@ -78,7 +75,6 @@ public class CameraActivity extends Fragment {
   public String defaultCamera;
   public boolean tapToTakePicture;
   public boolean dragEnabled;
-  public boolean tapToFocus;
 
   public int width;
   public int height;
@@ -145,30 +141,8 @@ public class CameraActivity extends Fragment {
 
               boolean isSingleTapTouch = gestureDetector.onTouchEvent(event);
               if (event.getAction() != MotionEvent.ACTION_MOVE && isSingleTapTouch) {
-                if (tapToTakePicture && tapToFocus) {
-                  setFocusArea((int)event.getX(0), (int)event.getY(0), new Camera.AutoFocusCallback() {
-                    public void onAutoFocus(boolean success, Camera camera) {
-                      if (success) {
-                        takePicture(0, 0, 85);
-                      } else {
-                        Log.d(TAG, "onTouch:" + " setFocusArea() did not suceed");
-                      }
-                    }
-                  });
-
-                } else if(tapToTakePicture){
+                if (tapToTakePicture) {
                   takePicture(0, 0, 85);
-
-                } else if(tapToFocus){
-                  setFocusArea((int)event.getX(0), (int)event.getY(0), new Camera.AutoFocusCallback() {
-                    public void onAutoFocus(boolean success, Camera camera) {
-                      if (success) {
-                        // A callback to JS might make sense here.
-                      } else {
-                        Log.d(TAG, "onTouch:" + " setFocusArea() did not suceed");
-                      }
-                    }
-                  });
                 }
                 return true;
               } else {
@@ -214,20 +188,6 @@ public class CameraActivity extends Fragment {
                 }
               }
               return true;
-            }
-          });
-          frameContainerLayout.setFocusableInTouchMode(true);
-          frameContainerLayout.requestFocus();
-          frameContainerLayout.setOnKeyListener( new android.view.View.OnKeyListener() {
-            @Override
-            public boolean onKey( android.view.View v, int keyCode, android.view.KeyEvent event ) {
-
-              if( keyCode == android.view.KeyEvent.KEYCODE_BACK )
-              {
-                eventListener.onBackButton();
-                return true;
-              }
-              return false;
             }
           });
         }
@@ -375,7 +335,10 @@ public class CameraActivity extends Fragment {
     return getActivity().getApplicationContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT);
   }
 
-  public static Bitmap applyMatrix(Bitmap source, Matrix matrix) {
+  public static Bitmap flipBitmap(Bitmap source) {
+    Matrix matrix = new Matrix();
+    matrix.preScale(1.0f, -1.0f);
+
     return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
   }
 
@@ -385,35 +348,15 @@ public class CameraActivity extends Fragment {
     }
   };
 
-  private static int exifToDegrees(int exifOrientation) {
-    if (exifOrientation == ExifInterface.ORIENTATION_ROTATE_90) { return 90; }
-    else if (exifOrientation == ExifInterface.ORIENTATION_ROTATE_180) {  return 180; }
-    else if (exifOrientation == ExifInterface.ORIENTATION_ROTATE_270) {  return 270; }
-    return 0;
-  }
-
   PictureCallback jpegPictureCallback = new PictureCallback(){
     public void onPictureTaken(byte[] data, Camera arg1){
       Log.d(TAG, "CameraPreview jpegPictureCallback");
 
       try {
-        Matrix matrix = new Matrix();
-        if (cameraCurrentlyLocked == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-          matrix.preScale(1.0f, -1.0f);
-        }
 
-        ExifInterface exifInterface = new ExifInterface(new ByteArrayInputStream(data));
-        int rotation = exifInterface.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-        int rotationInDegrees = exifToDegrees(rotation);
-
-        if (rotation != 0f) {
-          matrix.preRotate(rotationInDegrees);
-        }
-
-        // Check if matrix has changed. In that case, apply matrix and override data
-        if (!matrix.isIdentity()) {
+        if(cameraCurrentlyLocked == Camera.CameraInfo.CAMERA_FACING_FRONT) {
           Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-          bitmap = applyMatrix(bitmap, matrix);
+          bitmap = flipBitmap(bitmap);
 
           ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
           bitmap.compress(Bitmap.CompressFormat.JPEG, currentQuality, outputStream);
@@ -429,9 +372,6 @@ public class CameraActivity extends Fragment {
         Log.d(TAG, "CameraPreview OutOfMemoryError");
         // failed to allocate memory
         eventListener.onPictureTakenError("Picture too large (memory)");
-      } catch (IOException e) {
-        Log.d(TAG, "CameraPreview IOException");
-        eventListener.onPictureTakenError("IO Error when extracting exif");
       } catch (Exception e) {
         Log.d(TAG, "CameraPreview onPictureTaken general exception");
       } finally {
@@ -545,7 +485,7 @@ public class CameraActivity extends Fragment {
     }
   }
 
-  public void setFocusArea(final int pointX, final int pointY, final Camera.AutoFocusCallback callback) {
+  public void setFocusArea(final int pointX, final int pointY) {
     if (mCamera != null) {
 
       mCamera.cancelAutoFocus();
@@ -563,10 +503,19 @@ public class CameraActivity extends Fragment {
 
       try {
         setCameraParameters(parameters);
-        mCamera.autoFocus(callback);
+
+        mCamera.autoFocus(new Camera.AutoFocusCallback() {
+          public void onAutoFocus(boolean success, Camera camera) {
+            if (success) {
+              eventListener.onFocusSet(pointX, pointY);
+            } else {
+              eventListener.onFocusSetError("Focus set failed");
+            }
+          }
+        });
       } catch (Exception e) {
         Log.d(TAG, e.getMessage());
-        callback.onAutoFocus(false, this.mCamera);
+        eventListener.onFocusSetError("Focus set parameters failed");
       }
     }
   }

@@ -31,8 +31,6 @@
     BOOL tapToTakePicture = (BOOL)[command.arguments[5] boolValue];
     BOOL dragEnabled = (BOOL)[command.arguments[6] boolValue];
     BOOL toBack = (BOOL)[command.arguments[7] boolValue];
-    CGFloat alpha = (CGFloat)[command.arguments[8] floatValue];
-    BOOL tapToFocus = (BOOL) [command.arguments[9] boolValue];
 
     // Create the session manager
     self.sessionManager = [[CameraSessionManager alloc] init];
@@ -41,7 +39,6 @@
     self.cameraRenderController = [[CameraRenderController alloc] init];
     self.cameraRenderController.dragEnabled = dragEnabled;
     self.cameraRenderController.tapToTakePicture = tapToTakePicture;
-    self.cameraRenderController.tapToFocus = tapToFocus;
     self.cameraRenderController.sessionManager = self.sessionManager;
     self.cameraRenderController.view.frame = CGRectMake(x, y, width, height);
     self.cameraRenderController.delegate = self;
@@ -58,7 +55,7 @@
       [self.webView.superview addSubview:self.cameraRenderController.view];
       [self.webView.superview bringSubviewToFront:self.webView];
     } else {
-      self.cameraRenderController.view.alpha = alpha;
+      self.cameraRenderController.view.alpha = (CGFloat)[command.arguments[8] floatValue];
       [self.webView.superview insertSubview:self.cameraRenderController.view aboveSubview:self.webView];
     }
 
@@ -172,7 +169,7 @@
 - (void) setFocusMode:(CDVInvokedUrlCommand*)command {
   CDVPluginResult *pluginResult;
 
-  NSString * focusMode = [command.arguments objectAtIndex:0];
+  NSString * focusMode = [[command.arguments objectAtIndex:0] stringValue];
   if (self.sessionManager != nil) {
     [self.sessionManager setFocusMode:focusMode];
     NSString * focusMode = [self.sessionManager getFocusMode];
@@ -627,17 +624,8 @@
   return rotatedCGImage;
 }
 
-- (void) invokeTapToFocus:(CGPoint)point {
-  [self.sessionManager tapToFocus:point.x yPoint:point.y];
-}
-
 - (void) invokeTakePicture {
   [self invokeTakePicture:0.0 withHeight:0.0 withQuality:0.85];
-}
-
-- (void) invokeTakePictureOnFocus {
-    // the sessionManager will call onFocus, as soon as the camera is done with focussing.
-  [self.sessionManager takePictureOnFocus];
 }
 
 - (void) invokeTakePicture:(CGFloat) width withHeight:(CGFloat) height withQuality:(CGFloat) quality{
